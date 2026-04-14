@@ -3,7 +3,7 @@ import google.generativeai as genai
 
 st.set_page_config(page_title="المساعد الذكي | Gemini", page_icon="🤖")
 
-DEFAULT_API_KEY = "AIzaSyD3OE7tIgahmV8MHq_SDGchrldYfBir5pU"
+DEFAULT_API_KEY = "AIzaSyDBFclScUKXmJ-f67_BKXSXl-BM8mbm2Aw"
 
 st.title("🤖 المساعد الذكي (Gemini)")
 st.markdown("مرحباً! أنا مدعوم بأحدث نماذج Google. اسألني أي شيء.")
