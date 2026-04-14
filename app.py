@@ -80,6 +80,31 @@ if prompt:
         
         placeholder.markdown(full_response)
     
+    st.session_state.messages.append({"role": "assistant", "content": full_response})            payload = {"inputs": prompt}
+        
+        try:
+            with st.spinner("جاري التفكير..."):
+                response = requests.post(API_URL, headers=headers, json=payload, timeout=30)
+                result = response.json()
+                
+                if isinstance(result, list) and len(result) > 0:
+                    if "generated_text" in result[0]:
+                        full_response = result[0]["generated_text"]
+                    else:
+                        full_response = str(result[0])
+                elif isinstance(result, dict):
+                    full_response = result.get("generated_text", "عذراً لم أستطع توليد رد")
+                else:
+                    full_response = "عذراً لم أستطع توليد رد"
+                
+                if "Answer:" in full_response:
+                    full_response = full_response.split("Answer:")[-1].strip()
+                    
+        except Exception as e:
+            full_response = "حدث خطأ في الاتصال"
+        
+        placeholder.markdown(full_response)
+    
     st.session_state.messages.append({"role": "assistant", "content": full_response})        st.markdown(msg["content"])
 
 prompt = st.chat_input("اكتب سؤالك هنا...")
