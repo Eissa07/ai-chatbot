@@ -1,40 +1,148 @@
 import streamlit as st
 import requests
 import json
-import time
 
 # ============================================
-# إعدادات الصفحة - واجهة احترافية
+# إعدادات الصفحة
 # ============================================
 st.set_page_config(
     page_title="المساعد الذكي | AI Assistant",
     page_icon="🤖",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
 # ============================================
-# أنماط CSS مخصصة لتحسين المظهر
+# العنوان الرئيسي
 # ============================================
-st.markdown("""
-<style>
-    /* تنسيق عام */
-    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap');
-    html, body, [class*="css"] {
-        font-family: 'Tajawal', sans-serif;
-    }
+st.title("🤖 المساعد الذكي")
+st.markdown("مرحباً! أنا مساعدك الشخصي المدعوم بالذكاء الاصطناعي. اسألني أي شيء.")
+
+# ============================================
+# الشريط الجانبي
+# ============================================
+with st.sidebar:
+    st.header("⚙️ الإعدادات")
     
-    /* تحسين مظهر الشريط الجانبي */
-    .css-1d391kg {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    }
+    # اختيار النموذج
+    model_choice = st.selectbox(
+        "اختر النموذج",
+        ["GPT-2", "DialoGPT", "Flan-T5"]
+    )
     
-    /* تنسيق عنوان التطبيق */
-    .main-title {
-        text-align: center;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+    if model_choice == "GPT-2":
+        model_name = "openai-community/gpt2"
+    elif model_choice == "DialoGPT":
+        model_name = "microsoft/DialoGPT-medium"
+    else:
+        model_name = "google/flan-t5-large"
+    
+    st.markdown("---")
+    
+    # رمز Hugging Face
+    hf_token = st.text_input(
+        "أدخل رمز Hugging Face API",
+        type="password",
+        help="احصل عليه مجاناً من huggingface.co/settings/tokens"
+    )
+    
+    st.markdown("---")
+    st.markdown("### ℹ️ معلومات")
+    st.markdown("هذا التطبيق مفتوح المصدر بالكامل.")
+    
+    # زر مسح المحادثة
+    if st.button("🧹 مسح المحادثة"):
+        st.session_state.messages = []
+        st.rerun()
+
+# ============================================
+# تهيئة سجل المحادثة
+# ============================================
+if "messages" not in st.session_state:
+    st.session_state.messages = [
+        {"role": "assistant", "content": "مرحباً! 👋 كيف يمكنني مساعدتك اليوم؟"}
+    ]
+
+# ============================================
+# عرض الرسائل
+# ============================================
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+# ============================================
+# حقل الإدخال
+# ============================================
+if prompt := st.chat_input("اكتب سؤالك هنا..."):
+    # التحقق من وجود الرمز
+    if not hf_token:
+        st.error("⚠️ الرجاء إدخال رمز Hugging Face API في الشريط الجانبي")
+        st.stop()
+    
+    # إضافة رسالة المستخدم
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+    
+    # الرد من المساعد
+    with st.chat_message("assistant"):
+        message_placeholder = st.empty()
+        full_response = ""
+        
+        # إعداد API
+        API_URL = f"https://api-inference.huggingface.co/models/{model_name}"
+        headers = {"Authorization": f"Bearer {hf_token}"}
+        
+        # تحضير المدخلات
+        if "flan-t5" in model_name:
+            payload = {"inputs": f"Question: {prompt}\nAnswer:"}
+        else:
+            payload = {"inputs": prompt}
+        
+        try:
+            with st.spinner("جاري التفكير..."):
+                response = requests.post(API_URL, headers=headers, json=payload, timeout=30)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    
+                    if isinstance(result, list) and len(result) > 0:
+                        if "generated_text" in result[0]:
+                            full_response = result[0]["generated_text"]
+                        else:
+                            full_response = str(result[0])
+                    elif isinstance(result, dict):
+                        if "generated_text" in result:
+                            full_response = result["generated_text"]
+                        else:
+                            full_response = "عذراً، لم أستطع توليد رد."
+                    else:
+                        full_response = "عذراً، لم أستطع توليد رد."
+                    
+                    # تنظيف الرد
+                    if "Answer:" in full_response:
+                        full_response = full_response.split("Answer:")[-1].strip()
+                    
+                    if not full_response:
+                        full_response = "عذراً، لم أحصل على رد واضح. حاول مرة أخرى."
+                        
+                elif response.status_code == 503:
+                    full_response = "⏳ النموذج قيد التحميل. انتظر 30 ثانية وحاول مرة أخرى."
+                else:
+                    full_response = f"❌ خطأ {response.status_code}. تأكد من الرمز وحاول مرة أخرى."
+                    
+        except Exception as e:
+            full_response = "❌ حدث خطأ في الاتصال. تأكد من اتصالك بالإنترنت."
+        
+        message_placeholder.markdown(full_response)
+    
+    # حفظ الرد
+    st.session_state.messages.append({"role": "assistant", "content": full_response})
+
+# ============================================
+# تذييل
+# ============================================
+st.markdown("---")
+st.markdown("🤖 تطبيق مفتوح المصدر | مدعوم بـ Streamlit و Hugging Face")        -webkit-text-fill-color: transparent;
         font-size: 3rem;
         font-weight: 700;
         margin-bottom: 0.5rem;
