@@ -80,6 +80,52 @@ if prompt:
         
         placeholder.markdown(full_response)
     
+    st.session_state.messages.append({"role": "assistant", "content": full_response})        st.markdown(msg["content"])
+
+prompt = st.chat_input("اكتب سؤالك هنا...")
+
+if prompt:
+    if not hf_token or hf_token.startswith("hf_xxx"):
+        st.error("الرجاء إدخال رمز صحيح")
+        st.stop()
+    
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+    
+    with st.chat_message("assistant"):
+        placeholder = st.empty()
+        API_URL = f"https://api-inference.huggingface.co/models/{model_name}"
+        headers = {"Authorization": f"Bearer {hf_token}"}
+        
+        if "flan" in model_name:
+            payload = {"inputs": f"Question: {prompt}\nAnswer:"}
+        else:
+            payload = {"inputs": prompt}
+        
+        try:
+            with st.spinner("جاري التفكير..."):
+                response = requests.post(API_URL, headers=headers, json=payload, timeout=30)
+                result = response.json()
+                
+                if isinstance(result, list) and len(result) > 0:
+                    if "generated_text" in result[0]:
+                        full_response = result[0]["generated_text"]
+                    else:
+                        full_response = str(result[0])
+                elif isinstance(result, dict):
+                    full_response = result.get("generated_text", "عذراً لم أستطع توليد رد")
+                else:
+                    full_response = "عذراً لم أستطع توليد رد"
+                
+                if "Answer:" in full_response:
+                    full_response = full_response.split("Answer:")[-1].strip()
+                    
+        except Exception as e:
+            full_response = "حدث خطأ في الاتصال"
+        
+        placeholder.markdown(full_response)
+    
     st.session_state.messages.append({"role": "assistant", "content": full_response})if prompt := st.chat_input("اكتب سؤالك هنا..."):
     if not hf_token or hf_token.startswith("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"):
         st.error("⚠️ الرجاء إدخال رمز Hugging Face صحيح")
