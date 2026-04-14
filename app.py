@@ -1,5 +1,5 @@
 import streamlit as st
-import google.generativeai as genai
+import google.google.نننativeai as genai
 import os
 
 st.set_page_config(page_title="المساعد الذكي | Gemini", page_icon="🤖")
