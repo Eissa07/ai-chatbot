@@ -9,7 +9,7 @@ st.markdown("مرحباً! اسألني أي شيء.")
 # ============================================
 # الرمز المدمج - استبدل هذا برمزك الحقيقي
 # ============================================
-DEFAULT_TOKEN = "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"
+DEFAULT_TOKEN = "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"
 
 with st.sidebar:
     st.header("الإعدادات")
