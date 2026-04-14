@@ -1,83 +1,94 @@
 import streamlit as st
-import requests
+import google.generativeai as genai
+import os
 
-st.set_page_config(page_title="AI Chatbot", page_icon="🤖")
+st.set_page_config(page_title="المساعد الذكي | Gemini", page_icon="🤖")
 
-DEFAULT_TOKEN = "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"
+# ============================================
+# هذا هو السطر الوحيد الذي ستحتاج لتعديله
+# ============================================
+DEFAULT_API_KEY = "ضع_مفتاح_Gemini_API_الخاص_بك_هنا"
 
-st.title("🤖 المساعد الذكي")
-st.markdown("مرحباً! اسألني أي شيء.")
+st.title("🤖 المساعد الذكي (Gemini)")
+st.markdown("مرحباً! أنا مدعوم بأحدث نماذج Google. اسألني أي شيء.")
 
 with st.sidebar:
-    st.header("الإعدادات")
-    model_choice = st.selectbox("اختر النموذج", ["GPT-2", "DialoGPT", "Flan-T5"])
-    use_own_token = st.checkbox("استخدم رمزي الخاص", value=False)
-    if use_own_token:
-        hf_token = st.text_input("رمز Hugging Face", type="password")
+    st.header("⚙️ الإعدادات")
+    
+    # اختيار النموذج
+    model_choice = st.selectbox(
+        "اختر النموذج",
+        ["Gemini 2.0 Flash-Lite (سريع واقتصادي)", "Gemini 2.0 Flash (أحدث إصدار)"]
+    )
+    if "Flash-Lite" in model_choice:
+        model_name = "gemini-2.0-flash-lite"
     else:
-        hf_token = DEFAULT_TOKEN
-        st.success("التطبيق جاهز للاستخدام")
-    if st.button("مسح المحادثة"):
+        model_name = "gemini-2.0-flash"
+
+    # خيار إدخال مفتاح API مخصص
+    use_own_key = st.checkbox("استخدم مفتاح API خاص بي", value=False)
+    if use_own_key:
+        api_key = st.text_input("مفتاح Gemini API", type="password")
+        if not api_key:
+            st.warning("الرجاء إدخال مفتاح API للمتابعة.")
+    else:
+        api_key = DEFAULT_API_KEY
+        if api_key == "ضع_مفتاح_Gemini_API_الخاص_بك_هنا":
+            st.error("الرجاء إضافة مفتاح Gemini API الخاص بك في الكود أو تفعيل خيار 'استخدم مفتاح API خاص بي'.")
+        else:
+            st.success("✅ التطبيق جاهز للاستخدام!")
+    
+    # زر مسح المحادثة
+    if st.button("🧹 مسح المحادثة"):
         st.session_state.messages = []
         st.rerun()
 
-if model_choice == "GPT-2":
-    model_name = "openai-community/gpt2"
-elif model_choice == "DialoGPT":
-    model_name = "microsoft/DialoGPT-medium"
+# تهيئة نموذج Gemini
+if api_key and api_key != "AIzaSyD3OE7tIgahmV8MHq_SDGchrldYfBir5pU":
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel(model_name)
 else:
-    model_name = "google/flan-t5-large"
+    model = None
 
+# تهيئة سجل المحادثة
 if "messages" not in st.session_state:
-    st.session_state.messages = []
-    st.session_state.messages.append({"role": "assistant", "content": "مرحباً! كيف يمكنني مساعدتك؟"})
+    st.session_state.messages = [
+        {"role": "assistant", "content": "مرحباً! أنا Gemini من Google. كيف يمكنني مساعدتك اليوم؟"}
+    ]
 
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+# عرض الرسائل
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-prompt = st.chat_input("اكتب سؤالك هنا...")
-
-if prompt:
-    if not hf_token or hf_token.startswith("hf_xxx"):
-        st.error("الرجاء إدخال رمز صحيح")
+# حقل الإدخال
+if prompt := st.chat_input("اكتب سؤالك هنا..."):
+    # التحقق من المفتاح
+    if not api_key or api_key == "ضع_مفتاح_Gemini_API_الخاص_بك_هنا":
+        st.error("⚠️ الرجاء إدخال مفتاح Gemini API صحيح في الشريط الجانبي.")
         st.stop()
-    
+        
+    # إضافة رسالة المستخدم
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
     
+    # الرد من المساعد
     with st.chat_message("assistant"):
-        placeholder = st.empty()
-        API_URL = f"https://api-inference.huggingface.co/models/{model_name}"
-        headers = {"Authorization": f"Bearer {hf_token}"}
-        
-        if "flan" in model_name:
-            payload = {"inputs": f"Question: {prompt}\nAnswer:"}
-        else:
-            payload = {"inputs": prompt}
-        
+        message_placeholder = st.empty()
         try:
-            with st.spinner("جاري التفكير..."):
-                response = requests.post(API_URL, headers=headers, json=payload, timeout=30)
-                result = response.json()
+            with st.spinner("Gemini يفكر..."):
+                # استدعاء Gemini API
+                response = model.generate_content(prompt)
+                full_response = response.text
                 
-                if isinstance(result, list) and len(result) > 0:
-                    if "generated_text" in result[0]:
-                        full_response = result[0]["generated_text"]
-                    else:
-                        full_response = str(result[0])
-                elif isinstance(result, dict):
-                    full_response = result.get("generated_text", "عذراً لم أستطع توليد رد")
-                else:
-                    full_response = "عذراً لم أستطع توليد رد"
-                
-                if "Answer:" in full_response:
-                    full_response = full_response.split("Answer:")[-1].strip()
+                if not full_response:
+                    full_response = "عذراً، لم أحصل على رد. حاول مرة أخرى."
                     
         except Exception as e:
-            full_response = "حدث خطأ في الاتصال"
+            full_response = f"❌ حدث خطأ: {str(e)}"
         
-        placeholder.markdown(full_response)
+        message_placeholder.markdown(full_response)
     
+    # حفظ الرد
     st.session_state.messages.append({"role": "assistant", "content": full_response})
